@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting → Governed Execution</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="watson-chat"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- IBM Watson Orchestrate - Both Agents Configuration -->
+    <script type="module">
+      // Store both agent configurations
+      window.wxoAgents = {
+        meetingAnalysis: {
+          agentId: "ad102462-079b-4f86-ba0c-b959252d4976", 
+          agentEnvironmentId: "d760cc70-3533-4fde-aabe-d406532524d2"
+        },
+        actionGovernance: {
+          agentId: "1475be82-713c-49e0-bc99-529ab1b99f0e", 
+          agentEnvironmentId: "c7cf81e6-22a5-433c-93d5-047b9f9a5c6a"
+        }
+      };
+
+      // Set default agent
+      window.currentAgentKey = 'meetingAnalysis';
+
+      // Set initial configuration
+      const authToken = import.meta.env.VITE_WXO_AUTH_TOKEN || "";
+      if (!authToken) {
+        console.warn("[Watson] Missing auth token. Will try /api/wxo-token.");
+      }
+      window.wxOConfiguration = {
+        orchestrationID: "20260131-1618-5174-50d1-60461a7f7964_20260131-1619-1747-8092-d46ad2227c42",
+        hostURL: "https://ap-south-1.dl.watson-orchestrate.ibm.com",
+        rootElementID: "watson-chat",
+        authToken,
+        chatOptions: {
+            agentId: window.wxoAgents.meetingAnalysis.agentId, 
+            agentEnvironmentId: window.wxoAgents.meetingAnalysis.agentEnvironmentId
+        }
+      };
+
+      let tokenCache = authToken;
+
+      async function fetchAuthToken() {
+        if (tokenCache) return tokenCache;
+        try {
+          let response = await fetch("/api/wxo-token");
+          if (!response.ok) {
+            console.error("[Watson] Token fetch failed:", response.status);
+            try {
+              response = await fetch("http://localhost:5175/api/wxo-token");
+            } catch (fallbackError) {
+              console.error("[Watson] Token fetch fallback error:", fallbackError);
+              return "";
+            }
+            if (!response.ok) {
+              const details = await response.text();
+              console.error("[Watson] Token fetch failed (fallback):", response.status, details);
+              return "";
+            }
+          }
+          const data = await response.json();
+          tokenCache = data.access_token || "";
+          return tokenCache;
+        } catch (error) {
+          console.error("[Watson] Token fetch error:", error);
+          return "";
+        }
+      }
+
+      window.addEventListener("authTokenNeeded", async (event) => {
+        const token = await fetchAuthToken();
+        if (token) {
+          event.authToken = token;
+          window.wxOConfiguration.authToken = token;
+        }
+      });
+
+      // Function to switch agents
+      window.switchAgent = function(agentKey) {
+        if (window.wxoAgents[agentKey]) {
+          window.currentAgentKey = agentKey;
+          window.wxOConfiguration.chatOptions = {
+            agentId: window.wxoAgents[agentKey].agentId,
+            agentEnvironmentId: window.wxoAgents[agentKey].agentEnvironmentId
+          };
+          console.log('Switched to agent:', agentKey);
+          
+          // Reinitialize the chat with new agent
+          if (window.wxoLoader && window.wxoLoader.init) {
+            setTimeout(function() {
+              window.wxoLoader.init();
+            }, 100);
+          }
+        }
+      };
+
+      // Load Watson Orchestrate script once
+      setTimeout(async function () {
+        const token = await fetchAuthToken();
+        if (token) {
+          window.wxOConfiguration.authToken = token;
+        }
+        const script = document.createElement('script');
+        script.src = window.wxOConfiguration.hostURL + '/wxochat/wxoLoader.js?embed=true';
+        script.addEventListener('load', function () {
+            console.log('[Watson] Script loaded successfully');
+            if (window.wxoLoader) {
+              console.log('[Watson] Initializing wxoLoader...');
+              wxoLoader.init();
+              console.log('[Watson] wxoLoader initialized');
+            } else {
+              console.error('[Watson] wxoLoader not found after script load');
+            }
+        });
+        script.addEventListener('error', function(e) {
+            console.error('[Watson] Failed to load script:', e);
+        });
+        document.head.appendChild(script);
+      }, 500);                     
+    </script>
+  </body>
+</html>

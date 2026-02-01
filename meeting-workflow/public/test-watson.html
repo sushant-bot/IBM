@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watson Orchestrate Diagnostic</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        h1 { color: #333; }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #0f62fe;
+            background: #f0f7ff;
+        }
+        .status { font-weight: bold; }
+        .success { color: green; }
+        .error { color: red; }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IBM Watson Orchestrate - Diagnostic Test</h1>
+        
+        <div class="section">
+            <h3>Configuration Status</h3>
+            <p id="config-status" class="status"></p>
+            <pre id="config-details" style="background: #fff; border: 1px solid #ddd; padding: 10px; overflow-x: auto;"></pre>
+        </div>
+
+        <div class="section">
+            <h3>Agent Information</h3>
+            <ul id="agent-list"></ul>
+        </div>
+
+        <div class="section">
+            <h3>Watson Orchestrate Chat</h3>
+            <p>If Watson loads, you should see a chat widget below or as a floating button:</p>
+            <div id="watson-root" style="min-height: 400px; border: 1px solid #ddd; border-radius: 4px; background: #fafafa;"></div>
+        </div>
+
+        <div class="section">
+            <h3>Console Output</h3>
+            <div id="console-output" style="background: #1e1e1e; color: #00ff00; padding: 10px; border-radius: 4px; font-family: monospace; max-height: 300px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Capture console logs
+        const consoleLogs = [];
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog(...args);
+            consoleLogs.push('[LOG] ' + args.join(' '));
+            updateConsoleOutput();
+        };
+        console.error = function(...args) {
+            originalLog(...args);
+            consoleLogs.push('[ERROR] ' + args.join(' '));
+            updateConsoleOutput();
+        };
+
+        function updateConsoleOutput() {
+            const output = document.getElementById('console-output');
+            output.innerHTML = consoleLogs.map(log => log.replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('<br>');
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Watson configuration
+        window.wxoAgents = {
+            meetingAnalysis: {
+                agentId: "ad102462-079b-4f86-ba0c-b959252d4976", 
+                agentEnvironmentId: "d760cc70-3533-4fde-aabe-d406532524d2"
+            },
+            actionGovernance: {
+                agentId: "1475be82-713c-49e0-bc99-529ab1b99f0e", 
+                agentEnvironmentId: "c7cf81e6-22a5-433c-93d5-047b9f9a5c6a"
+            }
+        };
+
+        // Display configuration
+        const configStatus = document.getElementById('config-status');
+        const configDetails = document.getElementById('config-details');
+        const agentList = document.getElementById('agent-list');
+
+        window.wxOConfiguration = {
+            orchestrationID: "20260131-1618-5174-50d1-60461a7f7964_20260131-1619-1747-8092-d46ad2227c42",
+            hostURL: "https://ap-south-1.dl.watson-orchestrate.ibm.com",
+            rootElementID: "watson-root",
+            chatOptions: {
+                agentId: window.wxoAgents.meetingAnalysis.agentId, 
+                agentEnvironmentId: window.wxoAgents.meetingAnalysis.agentEnvironmentId
+            }
+        };
+
+        configStatus.innerHTML = '<span class="success">✓ Configuration loaded</span>';
+        configDetails.textContent = JSON.stringify(window.wxOConfiguration, null, 2);
+
+        // Display agents
+        Object.entries(window.wxoAgents).forEach(([key, agent]) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${key}</strong>: ${agent.agentId}`;
+            agentList.appendChild(li);
+        });
+
+        // Load Watson script
+        console.log('[Watson] Starting Watson Orchestrate initialization...');
+        setTimeout(function () {
+            const script = document.createElement('script');
+            script.src = window.wxOConfiguration.hostURL + '/wxochat/wxoLoader.js?embed=true';
+            
+            script.addEventListener('load', function () {
+                console.log('[Watson] ✓ Script loaded from: ' + script.src);
+                if (window.wxoLoader) {
+                    console.log('[Watson] ✓ wxoLoader object found');
+                    console.log('[Watson] Calling wxoLoader.init()...');
+                    wxoLoader.init();
+                    console.log('[Watson] ✓ wxoLoader.init() completed');
+                } else {
+                    console.error('[Watson] ✗ wxoLoader object NOT found');
+                }
+            });
+
+            script.addEventListener('error', function(e) {
+                console.error('[Watson] ✗ Script failed to load');
+                console.error('[Watson] Error:', e);
+            });
+
+            console.log('[Watson] Appending script to head...');
+            document.head.appendChild(script);
+        }, 500);
+    </script>
+</body>
+</html>
